@@ -1,232 +1,95 @@
 #include <iostream>
 #include <vector>
 #include <string>
-#include <algorithm>
-#include <stdexcept>
-using namespace std;
 
 class Database {
 private:
-    struct Table {
-        vector<string> columns;
-        vector<vector<string>> rows;
-    };
-    
-    vector<Table> tables;
-
-    int findTableIndex(const string& tableName) {
-        for (int i = 0; i < tables.size(); i++) {
-            if (tables[i].columns[0] == tableName) {
-                return i;
-            }
-        }
-        return -1; // This is when the Table is not found.
-    }
+    std::vector<std::vector<std::string>> data;
+    std::vector<std::string> headers;
 
 public:
-    void createTable(const string& tableName, const vector<string>& columns) {
-        if (findTableIndex(tableName) != -1) {
-            throw runtime_error("Table already exists.");
-        }
-        Table newTable;
-        newTable.columns.push_back(tableName);
-        newTable.columns.insert(newTable.columns.end(), columns.begin(), columns.end());
-        tables.push_back(newTable);
+    // Constructor to initialize the database
+    Database(std::vector<std::string> cols) {
+        headers = cols;
+        data.push_back(cols); // Add headers as the first row
     }
 
-    void insertInto(const string& tableName, const vector<string>& values) {
-        int tableIndex = findTableIndex(tableName);
-        if (tableIndex == -1) {
-            throw runtime_error("Table does not exist.");
-        }
-
-        Table& table = tables[tableIndex];
-        if (values.size() != table.columns.size() - 1) { // Minus 1 for table name column
-            throw runtime_error("Column count does not match value count.");
-        }
-        table.rows.push_back(values);
-    }
-
-    vector<vector<string>> selectFrom(const string& tableName, const vector<string>& columns, const string& condition = "") {
-        int tableIndex = findTableIndex(tableName);
-        if (tableIndex == -1) {
-            throw runtime_error("Table does not exist.");
-        }
-
-        Table& table = tables[tableIndex];
-        vector<int> colIndices;
-
-        if (columns.empty()) {
-            for (int i = 1; i < table.columns.size(); ++i) {
-                colIndices.push_back(i);
-            }
+    // CREATE operation
+    // Algorithm: Append a new row to the data
+    void create(std::vector<std::string> row) {
+        if (row.size() == headers.size()) {
+            data.push_back(row);
         } else {
-            for (const string& col : columns) {
-                auto it = find(table.columns.begin() + 1, table.columns.end(), col);
-                if (it != table.columns.end()) {
-                    colIndices.push_back(distance(table.columns.begin(), it));
-                } else {
-                    throw runtime_error("Column not found.");
-                }
-            }
+            std::cout << "Row size does not match headers size." << std::endl;
         }
-
-        vector<vector<string>> result;
-        for (const auto& row : table.rows) {
-            if (!condition.empty()) {
-                if (!evaluateCondition(row, table, condition)) {
-                    continue;
-                }
-            }
-            vector<string> selectedRow;
-            for (int idx : colIndices) {
-                selectedRow.push_back(row[idx - 1]);
-            }
-            result.push_back(selectedRow);
-        }
-        return result;
     }
 
-    void deleteFrom(const string& tableName, const string& condition) {
-        int tableIndex = findTableIndex(tableName);
-        if (tableIndex == -1) {
-            throw runtime_error("Table does not exist.");
+    // SELECT operation
+    // Algorithm: Select rows based on a single condition
+    void select(int columnIndex, const std::string& value) {
+        for (const auto& row : data) {
+            if (row[columnIndex] == value) {
+                for (const auto& item : row) {
+                    std::cout << item << " ";
+                }
+                std::cout << std::endl;
+            }
         }
-
-        Table& table = tables[tableIndex];
-        table.rows.erase(remove_if(table.rows.begin(), table.rows.end(),
-            [&](const vector<string>& row) {
-                return evaluateCondition(row, table, condition);
-            }), table.rows.end());
     }
 
-    string aggregateMax(const string& tableName, const string& column) {
-        int tableIndex = findTableIndex(tableName);
-        if (tableIndex == -1) {
-            throw runtime_error("Table does not exist.");
+    // DELETE operation
+    // Algorithm: Remove rows that match a condition
+    void deleteRow(int columnIndex, const std::string& value) {
+        for (auto it = data.begin() + 1; it != data.end(); ) {
+            if ((*it)[columnIndex] == value) {
+                it = data.erase(it);
+            } else {
+                ++it;
+            }
         }
+    }
 
-        Table& table = tables[tableIndex];
-        int colIndex = findColumnIndex(table, column);
-
-        string maxValue = table.rows[0][colIndex - 1];
-        for (const auto& row : table.rows) {
-            if (row[colIndex - 1] > maxValue) {
-                maxValue = row[colIndex - 1];
+    // MAX operation
+    // Algorithm: Find the maximum value in a specified column
+    std::string max(int columnIndex) {
+        std::string maxValue = data[1][columnIndex];
+        for (size_t i = 2; i < data.size(); ++i) {
+            if (data[i][columnIndex] > maxValue) {
+                maxValue = data[i][columnIndex];
             }
         }
         return maxValue;
     }
 
-    int aggregateSum(const string& tableName, const string& column) {
-        int tableIndex = findTableIndex(tableName);
-        if (tableIndex == -1) {
-            throw runtime_error("Table does not exist.");
-        }
-
-        Table& table = tables[tableIndex];
-        int colIndex = findColumnIndex(table, column);
-
-        int sum = 0;
-        for (const auto& row : table.rows) {
-            sum += stoi(row[colIndex - 1]);
-        }
-        return sum;
-    }
-
-    Table crossProduct(const string& table1Name, const string& table2Name) {
-        int table1Index = findTableIndex(table1Name);
-        int table2Index = findTableIndex(table2Name);
-
-        if (table1Index == -1 || table2Index == -1) {
-            throw runtime_error("One or both tables do not exist.");
-        }
-
-        Table& table1 = tables[table1Index];
-        Table& table2 = tables[table2Index];
-
-        Table result;
-        result.columns.insert(result.columns.end(), table1.columns.begin() + 1, table1.columns.end());
-        result.columns.insert(result.columns.end(), table2.columns.begin() + 1, table2.columns.end());
-
-        for (const auto& row1 : table1.rows) {
-            for (const auto& row2 : table2.rows) {
-                vector<string> newRow = row1;
-                newRow.insert(newRow.end(), row2.begin(), row2.end());
-                result.rows.push_back(newRow);
+    // Display the database
+    void display() {
+        for (const auto& row : data) {
+            for (const auto& item : row) {
+                std::cout << item << " ";
             }
+            std::cout << std::endl;
         }
-        return result;
-    }
-
-private:
-    int findColumnIndex(const Table& table, const string& column) {
-        auto it = find(table.columns.begin() + 1, table.columns.end(), column);
-        if (it != table.columns.end()) {
-            return distance(table.columns.begin(), it);
-        }
-        throw runtime_error("Column not found.");
-    }
-
-    bool evaluateCondition(const vector<string>& row, const Table& table, const string& condition) {
-        // For simplicity, let's assume the condition is always "Column=Value"
-        size_t pos = condition.find('=');
-        if (pos == string::npos) {
-            throw runtime_error("Unsupported condition format.");
-        }
-
-        string colName = condition.substr(0, pos);
-        string value = condition.substr(pos + 1);
-
-        int colIndex = findColumnIndex(table, colName);
-        return row[colIndex - 1] == value;
     }
 };
 
-// Example Usage
 int main() {
-    Database db;
+    Database db({"ID", "Name", "Age"});
 
-    // Create tables
-    db.createTable("Students", {"ID", "Name", "Age", "Grade"});
-    db.createTable("Courses", {"CourseID", "CourseName"});
+    db.create({"123", "Manoj", "49"});
+    db.create({"124", "Rishi", "17"});
+    db.create({"125", "Ananya", "15"});
 
-    // Insert data
-    db.insertInto("Students", {"1", "Alice", "20", "A"});
-    db.insertInto("Students", {"2", "Bob", "22", "B"});
-    db.insertInto("Students", {"3", "Charlie", "23", "A"});
+    std::cout << "Database contents:" << std::endl;
+    db.display();
 
-    db.insertInto("Courses", {"101", "Math"});
-    db.insertInto("Courses", {"102", "Physics"});
+    std::cout << "Select where Name = 'Ananya':" << std::endl;
+    db.select(1, "Ananya");
 
-    // Select query
-    cout << "Select * from Students where Age = 22:" << endl;
-    vector<vector<string>> result = db.selectFrom("Students", {}, "Age=22");
-    for (const auto& row : result) {
-        for (const auto& value : row) {
-            cout << value << " ";
-        }
-        cout << endl;
-    }
+    std::cout << "Max Age: " << db.max(2) << std::endl;
 
-    // Aggregate MAX query
-    cout << "\nMax Age in Students:" << endl;
-    cout << db.aggregateMax("Students", "Age") << endl;
+    db.deleteRow(1, "Rishi");
+    std::cout << "Database after deleting Rishi:" << std::endl;
+    db.display();
 
-    // Aggregate SUM query
-    cout << "\nSum of all Ages in Students:" << endl;
-    cout << db.aggregateSum("Students", "Age") << endl;
-
-    // Cross Product
-    cout << "\nCross Product of Students and Courses:" << endl;
-    Database::Table crossProductResult = db.crossProduct("Students", "Courses");
-    for (const auto& column : crossProductResult.columns) {
-        cout << column << " ";
-    }
-    cout << endl;
-    for (const auto& row : crossProductResult.rows) {
-        for (const auto& value : row) {
-            cout << value << " ";
-        }
-        cout << endl;
-    }
+    return 0;
+}
