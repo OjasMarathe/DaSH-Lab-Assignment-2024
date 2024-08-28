@@ -1,0 +1,52 @@
+#include <iostream>
+#include <vector>
+#include <ctime>
+#include <string>
+#include <chrono>
+#include <fstream>
+
+#include <nlohmann/json.hpp>  // This is used for JSON handling
+
+using namespace std;
+using json = nlohmann::json;
+
+string simulateAPIResponse(const string& prompt) {
+    return "This is a simulated response for: " + prompt;
+}
+
+int main() {
+    ifstream inputFile("input.txt");
+    ofstream outputFile("output.json");
+
+    vector<json> outputData;
+    string line;
+
+    while (getline(inputFile, line)) {
+        if (line.empty()) continue;
+
+        auto timeSent = chrono::system_clock::now(); // For capturing time
+        time_t timeSentEpoch = chrono::system_clock::to_time_t(timeSent); 
+
+        string response = simulateAPIResponse(line); // simulate a response
+        auto timeRecvd = chrono::system_clock::now();
+        time_t timeRecvdEpoch = chrono::system_clock::to_time_t(timeRecvd);
+
+        json promptData = { // create JSON object
+            {"Prompt", line},
+            {"Message", response},
+            {"TimeSent", timeSentEpoch},
+            {"TimeRecvd", timeRecvdEpoch},
+            {"Source", "SimulatedAPI"}
+        };
+
+        outputData.push_back(promptData);
+    }
+
+    // Write the JSON array to output.json
+    outputFile << outputData.dump(4);
+
+    inputFile.close();
+    outputFile.close();
+
+    cout << "Output written to output.json" << endl;
+}
