@@ -1,0 +1,109 @@
+#include <iostream>
+#include <fstream>
+#include <string>
+#include <vector>
+#include <unordered_map>
+#include <ctime>
+#include <chrono>
+#include <nlohmann/json.hpp>  // Include nlohmann/json.hpp for JSON handling
+
+using namespace std;
+using json = nlohmann::json;
+
+class Client {
+public:
+    int clientID;
+    vector<string> assignedPrompts;
+    unordered_map<string, string> receivedResponses;
+
+    Client(int id) : clientID(id) {}
+
+    // Simulate sending a prompt to the server and getting a response
+    string sendPromptToServer(const string& prompt) {
+        return "Server response for: " + prompt;
+    }
+
+    void receiveResponse(const string& prompt, const string& response) {
+        receivedResponses[prompt] = response;
+    }
+
+    void generateOutput() {
+        vector<json> outputData;
+
+        for (const auto& prompt : assignedPrompts) {
+            // Capture the current time for TimeSent
+            auto timeSent = chrono::system_clock::now();
+            time_t timeSentEpoch = chrono::system_clock::to_time_t(timeSent);
+
+            // Get the response from the server
+            string response = sendPromptToServer(prompt);
+
+            // Simulate receiving a response from the server (or potentially from a user)
+            receiveResponse(prompt, response);
+
+            // Capture the current time for TimeRecvd
+            auto timeRecvd = chrono::system_clock::now();
+            time_t timeRecvdEpoch = chrono::system_clock::to_time_t(timeRecvd);
+
+            // Determine source: If the response was received for a different prompt, set source to "user"
+            string source = (receivedResponses[prompt] == response) ? "Server" : "user";
+
+            // Create JSON object for this prompt
+            json promptData = {
+                {"Prompt", prompt},
+                {"Message", response},
+                {"TimeSent", timeSentEpoch},
+                {"TimeRecvd", timeRecvdEpoch},
+                {"Source", source},
+                {"ClientID", clientID}
+            };
+
+            outputData.push_back(promptData);
+        }
+
+        // Write the JSON array to output_client_X.json
+        string filename = "output_client_" + to_string(clientID) + ".json";
+        ofstream outputFile(filename);
+        outputFile << outputData.dump(4);  // Pretty print with 4-space indentation
+        outputFile.close();
+
+        cout << "Client " << clientID << " output written to " << filename << endl;
+    }
+};
+
+int main() {
+    ifstream inputFile("input.txt");
+
+    if (!inputFile.is_open()) {
+        cerr << "Error: Could not open input.txt" << endl;
+        return 1;
+    }
+
+    vector<Client> clients;
+    int numberOfClients = 3; // Example: Split prompts among 3 clients
+
+    // Initialize clients
+    for (int i = 0; i < numberOfClients; ++i) {
+        clients.emplace_back(i + 1);
+    }
+
+    string line;
+    int currentClient = 0;
+
+    // Distribute prompts among clients
+    while (getline(inputFile, line)) {
+        if (!line.empty()) {
+            clients[currentClient].assignedPrompts.push_back(line);
+            currentClient = (currentClient + 1) % numberOfClients; // Round-robin assignment
+        }
+    }
+
+    inputFile.close();
+
+    // Each client processes its assigned prompts and generates output
+    for (auto& client : clients) {
+        client.generateOutput();
+    }
+
+    return 0;
+}
