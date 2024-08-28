@@ -1,15 +1,15 @@
 #include <iostream>
-#include <fstream>
-#include <string>
 #include <vector>
 #include <ctime>
+#include <string>
 #include <chrono>
-#include <nlohmann/json.hpp>  // Include nlohmann/json.hpp for JSON handling
+#include <fstream>
+
+#include <nlohmann/json.hpp>  // This is used for JSON handling
 
 using namespace std;
 using json = nlohmann::json;
 
-// Simulated API Response Function
 string simulateAPIResponse(const string& prompt) {
     return "This is a simulated response for: " + prompt;
 }
@@ -18,30 +18,20 @@ int main() {
     ifstream inputFile("input.txt");
     ofstream outputFile("output.json");
 
-    if (!inputFile.is_open()) {
-        cerr << "Error: Could not open input.txt" << endl;
-        return 1;
-    }
-
     vector<json> outputData;
     string line;
 
     while (getline(inputFile, line)) {
         if (line.empty()) continue;
 
-        // Capture the current time for TimeSent
-        auto timeSent = chrono::system_clock::now();
-        time_t timeSentEpoch = chrono::system_clock::to_time_t(timeSent);
+        auto timeSent = chrono::system_clock::now(); // For capturing time
+        time_t timeSentEpoch = chrono::system_clock::to_time_t(timeSent); 
 
-        // Simulate API response
-        string response = simulateAPIResponse(line);
-
-        // Capture the current time for TimeRecvd
+        string response = simulateAPIResponse(line); // simulate a response
         auto timeRecvd = chrono::system_clock::now();
         time_t timeRecvdEpoch = chrono::system_clock::to_time_t(timeRecvd);
 
-        // Create JSON object for this prompt
-        json promptData = {
+        json promptData = { // create JSON object
             {"Prompt", line},
             {"Message", response},
             {"TimeSent", timeSentEpoch},
@@ -53,12 +43,10 @@ int main() {
     }
 
     // Write the JSON array to output.json
-    outputFile << outputData.dump(4);  // Pretty print with 4-space indentation
+    outputFile << outputData.dump(4);
 
     inputFile.close();
     outputFile.close();
 
     cout << "Output written to output.json" << endl;
-
-    return 0;
 }
